@@ -1,68 +1,39 @@
-// import { redirect } from '@sveltejs/kit';
-// import type { PageServerLoad, Actions } from './$types';
-// import { db } from '$lib/server/db';
+// admin/user/+page.server.ts
+import { PrismaClient } from '@prisma/client';
+import type { PageServerLoad, Actions } from './$types';
 
-// export const load: PageServerLoad = async ({ locals }) => {
-//   if (!locals.user || locals.user.role !== 'ADMIN') {
-//     throw redirect(302, '/');
-//   }
+const prisma = new PrismaClient();
 
-//   const [pendingUsers, approvedUsers, declinedUsers] = await Promise.all([
-//     db.user.findMany({
-//       where: { status: 'PENDING' },
-//       select: { id: true, username: true, email: true, createdAt: true }
-//     }),
-//     db.user.findMany({
-//       where: { status: 'APPROVED' },
-//       select: { id: true, username: true, email: true, createdAt: true }
-//     }),
-//     db.user.findMany({
-//       where: { status: 'DECLINED' },
-//       select: { id: true, username: true, email: true, createdAt: true }
-//     })
-//   ]);
+export const load: PageServerLoad = async () => {
+  const pendingUsers = await prisma.user.findMany({
+    where: { isApproved: false },
+    include: { role: true }
+  });
 
-//   return { pendingUsers, approvedUsers, declinedUsers };
-// };
+  return { pendingUsers };
+};
 
-// export const actions: Actions = {
-//   approve: async ({ request }) => {
-//     const data = await request.formData();
-//     const userId = data.get('userId');
+export const actions: Actions = {
+  approve: async ({ request }) => {
+    const data = await request.formData();
+    const userId = data.get('userId') as string;
 
-//     if (typeof userId !== 'string') {
-//       return { success: false, message: 'Invalid user ID' };
-//     }
+    await prisma.user.update({
+      where: { id: userId },
+      data: { isApproved: true, status: 'Approved' }
+    });
 
-//     await db.user.update({
-//       where: { id: userId },
-//       data: { status: 'APPROVED' }
-//     });
+    return { success: true };
+  },
 
-//     return { 
-//       success: true,
-//       message: 'User approved successfully',
-//       userId
-//     };
-//   },
+  decline: async ({ request }) => {
+    const data = await request.formData();
+    const userId = data.get('userId') as string;
 
-//   decline: async ({ request }) => {
-//     const data = await request.formData();
-//     const userId = data.get('userId');
+    await prisma.user.delete({
+      where: { id: userId }
+    });
 
-//     if (typeof userId !== 'string') {
-//       return { success: false, message: 'Invalid user ID' };
-//     }
-
-//     await db.user.update({
-//       where: { id: userId },
-//       data: { status: 'DECLINED' }
-//     });
-
-//     return { 
-//       success: true,
-//       message: 'User declined',
-//       userId
-//     };
-//   }
-// };
+    return { success: true };
+  }
+};
